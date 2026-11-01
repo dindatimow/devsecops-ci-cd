@@ -3,10 +3,23 @@
 
 from flask import Flask, jsonify
 from prometheus_flask_exporter import PrometheusMetrics
+from flask_talisman import Talisman
 
 app = Flask(__name__)
 
-# Mengaktifkan endpoint metrics untuk Prometheus
+# Mengaktifkan HTTP security headers.
+Talisman(
+    app,
+    force_https=False,
+    content_security_policy={
+        "default-src": "'self'",
+        "object-src": "'none'",
+        "frame-ancestors": "'none'",
+        "base-uri": "'self'"
+    }
+)
+
+# Mengaktifkan endpoint metrics untuk Prometheus.
 metrics = PrometheusMetrics(app)
 
 
