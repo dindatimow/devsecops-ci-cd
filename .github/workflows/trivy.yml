@@ -1,0 +1,56 @@
+﻿name: Trivy Docker Image Security Scan
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  trivy:
+    name: Docker Image Vulnerability Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Build Docker image
+        run: |
+          docker build -t devsecops-app:${{ github.sha }} .
+
+      - name: Generate complete Trivy report
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: devsecops-app:${{ github.sha }}
+          scanners: vuln,secret
+          format: json
+          output: trivy-report.json
+          exit-code: "0"
+
+      - name: Upload Trivy report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-security-report
+          path: trivy-report.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Trivy Quality Gate
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: devsecops-app:${{ github.sha }}
+          scanners: vuln
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          format: table
+          skip-setup-trivy: true
