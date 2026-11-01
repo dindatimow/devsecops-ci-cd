@@ -1,0 +1,85 @@
+
+name: Continuous Deployment
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deployment
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to Debian Server
+    runs-on: [self-hosted, Linux, X64, cd, debian]
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            -t devsecops-app:${GITHUB_SHA} \
+            -t devsecops-app:latest .
+
+      - name: Deploy application
+        run: |
+          set -e
+
+          if docker container inspect devsecops-app >/dev/null 2>&1; then
+            OLD_IMAGE=$(docker inspect devsecops-app --format '{{.Config.Image}}')
+            echo "Previous image: $OLD_IMAGE"
+          else
+            OLD_IMAGE=""
+          fi
+
+          docker rm -f devsecops-app || true
+
+          docker run -d \
+            --name devsecops-app \
+            -p 8080:5000 \
+            --restart unless-stopped \
+            devsecops-app:${GITHUB_SHA}
+
+          HEALTHY=false
+
+          for attempt in $(seq 1 12); do
+            if curl --fail --silent http://127.0.0.1:8080/health; then
+              HEALTHY=true
+              break
+            fi
+
+            echo "Waiting for application... ($attempt/12)"
+            sleep 5
+          done
+
+          if [ "$HEALTHY" = "true" ]; then
+            echo "Deployment successful."
+          else
+            echo "Deployment failed. Starting rollback."
+
+            docker logs devsecops-app || true
+            docker rm -f devsecops-app || true
+
+            if [ -n "$OLD_IMAGE" ]; then
+              docker run -d \
+                --name devsecops-app \
+                -p 8080:5000 \
+                --restart unless-stopped \
+                "$OLD_IMAGE"
+
+              echo "Previous container restored."
+            else
+              echo "No previous image available for rollback."
+            fi
+
+            exit 1
+          fi
