@@ -1,4 +1,4 @@
-﻿name: Trivy Docker Image Security Scan
+name: Trivy Docker Image Security Scan
 
 on:
   push:
@@ -36,7 +36,7 @@ jobs:
 
       - name: Upload Trivy report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: trivy-security-report
           path: trivy-report.json
@@ -54,3 +54,4 @@ jobs:
           exit-code: "1"
           format: table
           skip-setup-trivy: true
+
