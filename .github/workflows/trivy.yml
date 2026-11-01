@@ -1,3 +1,4 @@
+
 name: Trivy Docker Image Security Scan
 
 on:
@@ -55,3 +56,11 @@ jobs:
           format: table
           skip-setup-trivy: true
 
+      - name: Trivy Secret Quality Gate
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: devsecops-app:${{ github.sha }}
+          scanners: secret
+          exit-code: "1"
+          format: table
+          skip-setup-trivy: true
